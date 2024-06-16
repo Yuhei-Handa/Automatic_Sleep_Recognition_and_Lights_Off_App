@@ -7,6 +7,36 @@ from ultralytics import YOLO
 from PIL import Image, ImageTk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
+import time
+import ctypes
+from switchbot_api.switchbot_api import Bot
+
+class SleepRecognition:
+    def __init__(self, warn_threshold=0.5, sleep_threshold=0.9, sleep_time=10):
+        self.is_sleep = False
+        self.warn_threshold = warn_threshold
+        self.sleep_threshold = sleep_threshold
+        self.sleep_time = sleep_time
+        self.start_time = 0
+    
+    def check_sleep(self, mean_rate):
+        if mean_rate > self.sleep_threshold:
+            if not self.is_sleep:
+                self.start_time = time.time()
+                self.is_sleep = True
+            else:
+                if time.time() - self.start_time > self.sleep_time:
+                    return True
+                else:
+                    print("sleeping")
+        else:
+            self.is_sleep = False
+        return False
+
+# Define the function
+def monitor_off():
+    # -1 to turn off the monitor
+    ctypes.windll.user32.SendMessageW(0xFFFF, 0x112, 0xF170, 2)
 
 def get_class_name(all_classes, all_confidences):
     if len(all_classes) == 0:
@@ -52,7 +82,6 @@ class Application(tk.Frame):
         self.graph_h = 480
         self.graph_padx = 10
         self.graph_pady = 10
-
         # ---------------------------------------------------------
         # グラフの設定
         # ---------------------------------------------------------
@@ -89,16 +118,27 @@ class Application(tk.Frame):
         self.height = self.vcap.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
         # ---------------------------------------------------------
+        # 状態の更新フラグ
+        # ---------------------------------------------------------
+        self.is_updated = False
+
+        # ---------------------------------------------------------
+        # スリープ判定
+        # ---------------------------------------------------------
+        #睡眠を判定する時間間隔
+        self.sleep_time = 10
+        self.sleep_recognition = SleepRecognition(warn_threshold=self.warn_threshold, sleep_threshold=self.sleep_threshold, sleep_time=self.sleep_time)
+
+        # ---------------------------------------------------------
+        # SwitchBot API
+        # ---------------------------------------------------------
+        self.switchbot = Bot()
+    
+        # ---------------------------------------------------------
         # ウィジェットの作成
         # ---------------------------------------------------------
 
         self.create_widgets()
-
-
-        # ---------------------------------------------------------
-        # 状態の更新フラグ
-        # ---------------------------------------------------------
-        self.is_updated = False
 
         self.update()
 
@@ -133,7 +173,7 @@ class Application(tk.Frame):
 
         # Control
         self.control = tk.LabelFrame(self.master, text='Control', font=self.font_frame)
-        self.control.place(x=10, y=550, width=self.camera_w + self.graph_padx + self.graph_w + self.graph_padx + 150, height=120)
+        self.control.place(x=10, y=550, width=self.camera_w + self.graph_padx + self.graph_w + self.graph_padx + 150, height=200)
         self.control.grid_propagate(0)
 
         # Window Time
@@ -162,13 +202,33 @@ class Application(tk.Frame):
         self.btn_close = tk.Button(self.control, text='Close', font=self.font_btn_big, command=self.press_close_button)
         self.btn_close.grid(column=7, row=0, padx=20, pady=10)
 
+        # ---------------------------------------------------------
+        # Check sleep
+        #ラベルの作成
+        self.lbl_sleep = tk.Label(self.control, text="Sleep Time", font=self.font_lbl_small)
+        self.lbl_sleep.grid(column=0, row=1, padx=10, pady=10)
+
+        #睡眠時間の入力欄
+        self.entry_sleep = tk.Entry(self.control, font=self.font_lbl_small)
+        self.entry_sleep.grid(column=1, row=1, padx=10, pady=10)
+        # ---------------------------------------------------------
+        #ステータスの描画
+        # ---------------------------------------------------------
+        self.lbl_status = tk.Label(self.master, text=f"Status: Window Time: {self.window_time} [s] Warn Threshold: {self.warn_threshold} Sleep Threshold: {self.sleep_threshold} Sleep Time: {self.sleep_time} [s]", font=self.font_lbl_small)
+        self.lbl_status.place(x=20, y=720)
+
+
+
     def update_settings(self):
         try:
             self.window_time = int(self.entry_window_time.get())
             self.warn_threshold = float(self.entry_warn_threshold.get())
             self.sleep_threshold = float(self.entry_sleep_threshold.get())
-            
+            self.sleep_time = int(self.entry_sleep.get())
             self.reset_threshold = int(self.window_time / (self.delay / 1000))
+
+            self.sleep_recognition = SleepRecognition(warn_threshold=self.warn_threshold, sleep_threshold=self.sleep_threshold, sleep_time=self.sleep_time)
+
             self.xrange = np.arange(0, self.window_time, self.delay / 1000)
 
             self.mean_rate_array = np.array([])
@@ -191,6 +251,8 @@ class Application(tk.Frame):
             self.ax.set_xlim(0, self.window_time)
             self.ax.set_ylim(0, 1)
 
+            self.lbl_status = tk.Label(self.master, text=f"Status: Window Time: {self.window_time} [s] Warn Threshold: {self.warn_threshold} Sleep Threshold: {self.sleep_threshold} Sleep Time: {self.sleep_time} [s]", font=self.font_lbl_small)
+            self.lbl_status.place(x=20, y=720)
             self.canvas2.draw()
         except ValueError:
             print("Invalid input for one of the settings")
@@ -260,6 +322,18 @@ class Application(tk.Frame):
         self.canvas1.create_image(0, 0, image=self.photo, anchor=tk.NW)
 
         self.master.after(self.next_time, self.update)
+
+        #睡眠判定
+        is_sleep = self.sleep_recognition.check_sleep(mean_rate)
+        if is_sleep:
+            print("sleep")
+            self.switchbot.press()
+            monitor_off()
+            time.sleep(10)
+            self.master.destroy()
+        else:
+            #print("awake")
+            pass
 
     def press_close_button(self):
         self.master.destroy()
