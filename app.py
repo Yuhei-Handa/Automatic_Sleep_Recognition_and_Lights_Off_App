@@ -224,7 +224,6 @@ class Application(tk.Frame):
             self.sleep_threshold = float(self.entry_sleep_threshold.get())
             self.sleep_time = int(self.entry_sleep.get())
             self.reset_threshold = int(self.window_time / (self.delay / 1000))
-            self.turn_on_time = time.time()
 
             self.sleep_recognition = SleepRecognition(warn_threshold=self.warn_threshold, sleep_threshold=self.sleep_threshold, sleep_time=self.sleep_time)
 
@@ -333,9 +332,6 @@ class Application(tk.Frame):
             self.master.destroy()
         else:
             #print("awake")
-            if time.time() - self.turn_on_time > 300:
-                self.switchbot.turn_on()
-                self.turn_on_time = time.time()
             pass
 
     def press_close_button(self):

@@ -50,10 +50,16 @@ class Bot:
     def get_status(self):
         res = requests.get(self.devices_url, headers=self.apiHeader)
         data = res.json()
-        power = data['body']['power']
-        deviceMode = data['body']['deviceMode']
-        return power, deviceMode
 
+        if "body" in data.keys():
+            power = data['body']['power']
+            deviceMode = data['body']['deviceMode']
+            return power, deviceMode
+        
+        else:
+            print(data)
+
+            # return power, deviceMode
     def press(self):
         res = requests.post(self.command, headers=self.apiHeader, json=self.input_data)
         data = res.json()
