@@ -128,12 +128,14 @@ class Application(tk.Frame):
         #睡眠を判定する時間間隔
         self.sleep_time = 10
         self.sleep_recognition = SleepRecognition(warn_threshold=self.warn_threshold, sleep_threshold=self.sleep_threshold, sleep_time=self.sleep_time)
-
         # ---------------------------------------------------------
         # SwitchBot API
         # ---------------------------------------------------------
         self.switchbot = Bot()
-    
+        #電源を入れる
+        self.switchbot.turn_on()
+        #電源を入れなおす時間
+        self.turn_on_time = time.time()
         # ---------------------------------------------------------
         # ウィジェットの作成
         # ---------------------------------------------------------
@@ -204,20 +206,16 @@ class Application(tk.Frame):
 
         # ---------------------------------------------------------
         # Check sleep
-        #ラベルの作成
         self.lbl_sleep = tk.Label(self.control, text="Sleep Time", font=self.font_lbl_small)
         self.lbl_sleep.grid(column=0, row=1, padx=10, pady=10)
 
-        #睡眠時間の入力欄
         self.entry_sleep = tk.Entry(self.control, font=self.font_lbl_small)
         self.entry_sleep.grid(column=1, row=1, padx=10, pady=10)
         # ---------------------------------------------------------
-        #ステータスの描画
+        #Show Status
         # ---------------------------------------------------------
         self.lbl_status = tk.Label(self.master, text=f"Status: Window Time: {self.window_time} [s] Warn Threshold: {self.warn_threshold} Sleep Threshold: {self.sleep_threshold} Sleep Time: {self.sleep_time} [s]", font=self.font_lbl_small)
         self.lbl_status.place(x=20, y=720)
-
-
 
     def update_settings(self):
         try:
@@ -226,6 +224,7 @@ class Application(tk.Frame):
             self.sleep_threshold = float(self.entry_sleep_threshold.get())
             self.sleep_time = int(self.entry_sleep.get())
             self.reset_threshold = int(self.window_time / (self.delay / 1000))
+            self.turn_on_time = time.time()
 
             self.sleep_recognition = SleepRecognition(warn_threshold=self.warn_threshold, sleep_threshold=self.sleep_threshold, sleep_time=self.sleep_time)
 
@@ -259,6 +258,7 @@ class Application(tk.Frame):
 
     def update(self):
         # ビデオソースからフレームを取得
+
         _, frame = self.vcap.read()
 
         results = self.model(frame, show=False, conf=0.65, iou=0.5, device='cuda:0')
@@ -333,6 +333,9 @@ class Application(tk.Frame):
             self.master.destroy()
         else:
             #print("awake")
+            if time.time() - self.turn_on_time > 300:
+                self.switchbot.turn_on()
+                self.turn_on_time = time.time()
             pass
 
     def press_close_button(self):

@@ -58,6 +58,28 @@ class Bot:
         res = requests.post(self.command, headers=self.apiHeader, json=self.input_data)
         data = res.json()
         return data
+    
+    def turn_on(self):
+        #状態がoffの場合のみ実行
+        power, deviceMode = self.get_status()
+        if power == 'off':
+            self.input_data['command'] = 'turnOn'
+            res = requests.post(self.command, headers=self.apiHeader, json=self.input_data)
+            data = res.json()
+            return data
+        else:
+            return 'The device is already on.'
+        
+    def turn_off(self):
+        #状態がonの場合のみ実行
+        power, deviceMode = self.get_status()
+        if power == 'on':
+            self.input_data['command'] = 'turnOff'
+            res = requests.post(self.command, headers=self.apiHeader, json=self.input_data)
+            data = res.json()
+            return data
+        else:
+            return 'The device is already off.'
 
     def switch(self):
         power, deviceMode = self.get_status()
